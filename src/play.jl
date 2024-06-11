@@ -28,8 +28,9 @@ function play!(terminal::REPL.Terminals.UnixTerminal, env::AbstractGridWorld, fi
     terminal_in = terminal.in_stream
     file = open_maybe(file_name)
 
-    action_keys = get_action_keys(env)
-    key_bindings = "Key bindings to play: 'q': quit, 'r': GW.reset!, $(action_keys): GW.act!"
+    action_keys_agent1 = ('w', 's', 'a', 'd')
+    action_keys_agent2 = ('i', 'k', 'j', 'l')
+    key_bindings = "Key bindings to play: 'q': quit, 'r': GW.reset!, $(action_keys_agent1): agent1 act, $(action_keys_agent2): agent2 act"
 
     char = nothing
 
@@ -59,8 +60,10 @@ function play!(terminal::REPL.Terminals.UnixTerminal, env::AbstractGridWorld, fi
                 return nothing
             elseif char == 'r'
                 reset!(env)
-            elseif char in action_keys
-                act!(env, findfirst(==(char), action_keys))
+            elseif char in action_keys_agent1
+                act!(env, findfirst(==(char), action_keys_agent1), 1)
+            elseif char in action_keys_agent2
+                act!(env, findfirst(==(char), action_keys_agent2), 2)
             end
 
             write(terminal_out, EMPTY_SCREEN)
@@ -73,6 +76,7 @@ function play!(terminal::REPL.Terminals.UnixTerminal, env::AbstractGridWorld, fi
 
     return nothing
 end
+
 
 play!(env::AbstractGridWorld; file_name = nothing, frame_start_delimiter = DEFAULT_FRAME_START_DELIMITER) = play!(REPL.TerminalMenus.terminal, env, file_name, frame_start_delimiter)
 
