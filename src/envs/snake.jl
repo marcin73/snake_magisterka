@@ -136,6 +136,7 @@ function GW.act!(env::Snake, action, agent)
     if tile_map[WALL, new_agent_position] || tile_map[BODY1, new_agent_position] || tile_map[BODY2, new_agent_position]
         env.reward = env.terminal_penalty
         env.done = true
+        GW.reset!(env)
     elseif tile_map[FOOD, new_agent_position]
         tile_map[agent == 1 ? AGENT1 : AGENT2, agent_position] = false
         if agent == 1
@@ -147,6 +148,11 @@ function GW.act!(env::Snake, action, agent)
 
         DS.enqueue!(agent_body, new_agent_position)
         tile_map[agent == 1 ? BODY1 : BODY2, new_agent_position] = true
+
+        if length(agent_body) > 4
+            last_position = DS.dequeue!(agent_body)
+            tile_map[agent == 1 ? BODY1 : BODY2, last_position] = false
+        end
 
         tile_map[FOOD, new_agent_position] = false
 
@@ -173,8 +179,10 @@ function GW.act!(env::Snake, action, agent)
         DS.enqueue!(agent_body, new_agent_position)
         tile_map[agent == 1 ? BODY1 : BODY2, new_agent_position] = true
 
-        last_position = DS.dequeue!(agent_body)
-        tile_map[agent == 1 ? BODY1 : BODY2, last_position] = false
+        if length(agent_body) > 4
+            last_position = DS.dequeue!(agent_body)
+            tile_map[agent == 1 ? BODY1 : BODY2, last_position] = false
+        end
 
         env.reward = zero(env.reward)
         env.done = false
@@ -182,6 +190,7 @@ function GW.act!(env::Snake, action, agent)
 
     return nothing
 end
+
 
 
 function move_agent(position, action)
@@ -204,6 +213,7 @@ function handle_agent(env, agent, body, body_queue, agent_position, new_agent_po
     if (tile_map[WALL, new_agent_position] || tile_map[BODY1, new_agent_position] || tile_map[BODY2, new_agent_position])
         env.reward = env.terminal_penalty
         env.done = true
+        GW.reset!(env)
     elseif tile_map[FOOD, new_agent_position]
         tile_map[agent, agent_position] = false
         tile_map[agent, new_agent_position] = true
@@ -231,8 +241,10 @@ function handle_agent(env, agent, body, body_queue, agent_position, new_agent_po
         DS.enqueue!(body_queue, new_agent_position)
         tile_map[body, new_agent_position] = true
 
-        last_position = DS.dequeue!(body_queue)
-        tile_map[body, last_position] = false
+        if length(body_queue) > 4
+            last_position = DS.dequeue!(body_queue)
+            tile_map[body, last_position] = false
+        end
 
         env.reward = zero(env.reward)
         env.done = false
@@ -250,7 +262,7 @@ GW.get_action_names(env::Snake) = (:MOVE_UP, :MOVE_DOWN, :MOVE_LEFT, :MOVE_RIGHT
 GW.get_object_names(env::Snake) = (:AGENT1, :WALL, :BODY1, :FOOD, :AGENT2, :BODY2)
 
 function GW.get_pretty_tile_map(env::Snake, position::CartesianIndex{2})
-    characters = ('☻', '█', '∘', '♦', '☻', '∘', '⋅')
+    characters = ('☻', '█', 'x', '♦', '☻', 'x', '⋅')
 
     object = findfirst(@view env.tile_map[:, position])
     if isnothing(object)
@@ -265,7 +277,7 @@ function GW.get_pretty_sub_tile_map(env::Snake, window_size, position::Cartesian
     agent1_position = env.agent1_position
     agent2_position = env.agent2_position
 
-    characters = ('☻', '█', '∘', '♦', '☻', '∘', '⋅')
+    characters = ('☻', '█', 'x', '♦', '☻', 'x', '⋅')
 
     sub_tile_map1 = GW.get_sub_tile_map(tile_map, agent1_position, window_size)
     sub_tile_map2 = GW.get_sub_tile_map(tile_map, agent2_position, window_size)
@@ -296,7 +308,8 @@ function Base.show(io::IO, ::MIME"text/plain", env::Snake)
     str = str * "\ndone: $(env.done)"
     str = str * "\naction_names: $(GW.get_action_names(env))"
     str = str * "\nobject_names: $(GW.get_object_names(env))"
-    print(io, str)
+    len = length(env.body1)
+    print(io, str, len)
     return nothing
 end
 

@@ -1,4 +1,4 @@
-gitinclude("single_room_undirected.jl")
+include("single_room_undirected.jl")
 include("single_room_directed.jl")
 include("grid_rooms_undirected.jl")
 include("grid_rooms_directed.jl")
