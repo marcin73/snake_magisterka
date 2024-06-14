@@ -146,3 +146,66 @@ function replay(terminal::REPL.Terminals.UnixTerminal, file_name::AbstractString
 end
 
 replay(; file_name, frame_start_delimiter = DEFAULT_FRAME_START_DELIMITER, frame_rate = nothing) = replay(REPL.TerminalMenus.terminal, file_name, frame_start_delimiter, frame_rate)
+
+function predefined_play!(terminal::REPL.Terminals.UnixTerminal, env::AbstractGridWorld, file_name::Union{Nothing, AbstractString}, frame_start_delimiter::AbstractString)
+    terminal_out = terminal.out_stream
+    terminal_in = terminal.in_stream
+    file = open_maybe(file_name)
+
+    action_keys_agent1 = ('w', 's', 'a', 'd')
+    action_keys_agent2 = ('i', 'k', 'j', 'l')
+    key_bindings = "Key bindings to play: 'q': quit, 'r': GW.reset!, $(action_keys_agent1): agent1 act, $(action_keys_agent2): agent2 act"
+
+    char = nothing
+
+    write(terminal_out, CLEAR_SCREEN)
+    write(terminal_out, MOVE_CURSOR_TO_ORIGIN)
+    write(terminal_out, HIDE_CURSOR)
+
+    REPL.Terminals.raw!(terminal, true)
+
+    try
+        while true
+            write_maybe(file, frame_start_delimiter)
+
+            frame = key_bindings
+            frame = frame * "\n" * "Last play character read: $(char)"
+            frame = frame * "\n" * repr(MIME"text/plain"(), env)
+
+            write_maybe(terminal_out, frame)
+            write_maybe(file, frame)
+
+            # Randomly select actions for each agent
+            action1 = rand(1:4)
+            action2 = rand(1:4)
+
+            act!(env, action1, 1)
+            act!(env, action2, 2)
+
+            char = read(terminal_in, Char)
+
+            if char == 'q'
+                write(terminal_out, SHOW_CURSOR)
+                close_maybe(file)
+                REPL.Terminals.raw!(terminal, false)
+                return nothing
+            elseif char == 'r'
+                reset!(env)
+            elseif char in action_keys_agent1
+                act!(env, findfirst(==(char), action_keys_agent1), 1)
+            elseif char in action_keys_agent2
+                act!(env, findfirst(==(char), action_keys_agent2), 2)
+            end
+
+            write(terminal_out, EMPTY_SCREEN)
+        end
+    finally
+        write(terminal_out, SHOW_CURSOR)
+        close_maybe(file)
+        REPL.Terminals.raw!(terminal, false)
+    end
+
+    return nothing
+end
+
+predefined_play!(env::AbstractGridWorld; file_name = nothing, frame_start_delimiter = DEFAULT_FRAME_START_DELIMITER) = predefined_play!(REPL.TerminalMenus.terminal, env, file_name, frame_start_delimiter)

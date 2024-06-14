@@ -331,4 +331,18 @@ RLBase.action_space(env::GW.RLBaseEnv{E}) where {E <: Snake} = Base.OneTo(NUM_AC
 RLBase.reward(env::GW.RLBaseEnv{E}) where {E <: Snake} = env.env.reward
 RLBase.is_terminated(env::GW.RLBaseEnv{E}) where {E <: Snake} = env.env.done
 
+
+function run_predefined_strategy!(env::Snake; max_steps::Int = 100)
+    for _ in 1:max_steps
+        # Replace with your predefined strategy logic here
+        action1 = rand(1:NUM_ACTIONS)
+        action2 = rand(1:2)
+        GW.act!(env, action1, action2)
+        
+
+        
+    end
+end
+
+
 end # module
