@@ -11,4 +11,4 @@ env = GridWorlds.SnakeModule.Snake()
 learner = TDLearning.TDLearner()
 
 # Uruchomienie nauki TD-learning, zapis do csv i liczna ezpizodow
-TDLearning.run_td_learning!(env, learner, 1000, "test.csv")  # Liczba epizodów do nauki
+TDLearning.run_td_learning!(env, learner, 2000, "test.csv")  # Liczba epizodów do nauki

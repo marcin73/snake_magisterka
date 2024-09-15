@@ -34,9 +34,11 @@ mutable struct Snake{R, RNG} <: GW.AbstractGridWorld
     body2::DS.Queue{CartesianIndex{2}}
     alive1::Bool # czy zyje waz 1
     alive2::Bool # czy zyuje waz 2
+    food1::R
+    food2::R
 end
 
-function Snake(; R = Float32, height = 8, width = 8, rng = Random.GLOBAL_RNG)
+function Snake(; R = Float32, height = 10, width = 10, rng = Random.GLOBAL_RNG)
     tile_map = falses(NUM_OBJECTS, height, width)
 
     tile_map[WALL, 1, :] .= true
@@ -61,13 +63,14 @@ function Snake(; R = Float32, height = 8, width = 8, rng = Random.GLOBAL_RNG)
 
     reward1 = zero(R)
     reward2 = zero(R)
-    food_reward = one(R) * 50 #zmiana na bardzo duza wartosc, chcialem zobaczyc czy waz w ogole lapie cos
+    food_reward = one(R) * 3 #zmiana na bardzo duza wartosc, chcialem zobaczyc czy waz w ogole lapie cos
     terminal_reward = convert(R, height * width)
     terminal_penalty = convert(R, -height * width)
     done = false
-
+    food1 = zero(R)
+    food2 = zero(R)
     #true, true na koncu jako avlive1, alive2
-    env = Snake(tile_map, agent1_position, agent2_position, reward1, reward2, rng, done, terminal_reward, terminal_penalty, food_reward, food_position, body1, body2, true, true)
+    env = Snake(tile_map, agent1_position, agent2_position, reward1, reward2, rng, done, terminal_reward, terminal_penalty, food_reward, food_position, body1, body2, true, true, food1, food2)
 
     GW.reset!(env)
 
@@ -115,12 +118,16 @@ function GW.reset!(env::Snake)
     env.done = false
     env.alive1 = true
     env.alive2 = true
+    env.food1 = zero(env.food1)
+    env.food2 = zero(env.food2)
 
     return nothing
 end
 function GW.act!(env::Snake, action, agent)
     @assert action in Base.OneTo(NUM_ACTIONS) "Invalid action $(action). Action must be in Base.OneTo($(NUM_ACTIONS))"
     @assert agent in (1, 2) "Invalid agent $(agent). Agent must be 1 or 2"
+
+    
 
     tile_map = env.tile_map
     rng = env.rng
@@ -129,6 +136,8 @@ function GW.act!(env::Snake, action, agent)
     _, height, width = size(tile_map)
     agent_position = agent == 1 ? env.agent1_position : env.agent2_position
     agent_body = agent == 1 ? body1 : body2
+
+    previous_distance = abs(agent_position[1] - env.food_position[1]) + abs(agent_position[2] - env.food_position[2])
 
     new_agent_position = if action == 1
         GW.move_up(agent_position)
@@ -139,6 +148,8 @@ function GW.act!(env::Snake, action, agent)
     else
         GW.move_right(agent_position)
     end
+
+    new_distance = abs(new_agent_position[1] - env.food_position[1]) + abs(new_agent_position[2] - env.food_position[2])
 
     snake_died = false
 
@@ -156,8 +167,10 @@ function GW.act!(env::Snake, action, agent)
         tile_map[agent == 1 ? AGENT1 : AGENT2, agent_position] = false
         if agent == 1
             env.agent1_position = new_agent_position
+            env.food1 += 1
         else
             env.agent2_position = new_agent_position
+            env.food2 += 1
         end
         tile_map[agent == 1 ? AGENT1 : AGENT2, new_agent_position] = true
 
@@ -184,9 +197,11 @@ function GW.act!(env::Snake, action, agent)
             tile_map[FOOD, new_food_position] = true
 
             if agent == 1
-                env.reward1 += env.food_reward
+                env.reward1 += (env.food_reward * 1) 
+                env.reward2 += env.food_reward * 0
             else
-                env.reward2 += env.food_reward
+                env.reward2 += env.food_reward * 1
+                env.reward1 += env.food_reward * 0
             end
         end
     else
@@ -206,19 +221,33 @@ function GW.act!(env::Snake, action, agent)
             tile_map[agent == 1 ? BODY1 : BODY2, last_position] = false
         end
 
+        if new_distance < previous_distance
+            if agent == 1
+                env.reward1 += 2.5  # Nagroda za zbliżenie się do owocu
+            else
+                env.reward2 += 2.5  # Nagroda za zbliżenie się do owocu
+            end
+        end
+
         if agent == 1
-            env.reward1 -= 0.1  # kazdy ruch obarczony jest kara
-            env.reward1 -= (abs(env.agent1_position[1] - env.food_position[1]) + abs(env.agent1_position[2] - env.food_position[2])) / 100.0  # oddalanie sie od jedzenia jest karane
-            env.reward1 += (min(env.agent1_position[1], height - env.agent1_position[1]) + min(env.agent1_position[2], width - env.agent1_position[2])) / 100.0  # oddalanie sie od sciany jest nagradzane
+            env.reward1 -= (1 + abs(env.reward1)) / 100 # kazdy ruch obarczony jest kara
+            #env.reward1 -= (abs(env.agent1_position[1] - env.food_position[1]) + abs(env.agent1_position[2] - env.food_position[2])) / 3 # oddalanie sie od jedzenia jest karane
+           #env.reward1 += (min(env.agent1_position[1], height - env.agent1_position[1]) + min(env.agent1_position[2], width - env.agent1_position[2])) / 10.0  # oddalanie sie od sciany jest nagradzane
+            #env.reward1 += (abs(env.agent1_position[1] - env.agent2_position[1]) + abs(env.agent1_position[2] - env.agent2_position[2])) / 2 #oddalanie sie od siebie punktuje
         else
-            env.reward2 -= 0.1  # jw
-            env.reward2 -= (abs(env.agent2_position[1] - env.food_position[1]) + abs(env.agent2_position[2] - env.food_position[2])) / 100.0  # jw
-            env.reward2 += (min(env.agent2_position[1], height - env.agent2_position[1]) + min(env.agent2_position[2], width - env.agent2_position[2])) / 100.0  # jw
+            env.reward2 -= (1 + abs(env.reward2)) / 100 
+            #env.reward2 -= (abs(env.agent2_position[1] - env.food_position[1]) + abs(env.agent2_position[2] - env.food_position[2])) / 3  # jw
+            #env.reward2 += (min(env.agent2_position[1], height - env.agent2_position[1]) + min(env.agent2_position[2], width - env.agent2_position[2])) / 10.0  # jw
+            #env.reward2 += (abs(env.agent1_position[1] - env.agent2_position[1]) + abs(env.agent1_position[2] - env.agent2_position[2])) / 2 #oddalanie sie od siebie punktuje
         end
     end
 
+    if env.reward1 < -1000 || env.reward2 < -1000
+        env.done = true
+    end
+
     # jak oba umra to konczymy, czyli Done
-    if !env.alive1 && !env.alive2
+    if (!env.alive1 && !env.alive2) || (env.reward1 < -1000 || env.reward2 < -1000)
         env.done = true
     end
 
